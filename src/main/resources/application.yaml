@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: aperture
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/aperture_db
+    username: postgres
+    password: root
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: true
+    properties:
+      hibernate:
+        format-sql: true
+
+  flyway:
+    enabled: false
+
+server:
+  port: 8080
