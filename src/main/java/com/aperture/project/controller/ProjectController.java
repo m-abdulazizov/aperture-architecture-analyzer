@@ -6,6 +6,8 @@ import com.aperture.project.payload.ProjectCreateRequest;
 import com.aperture.project.payload.ProjectCreateResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,5 +31,10 @@ public class ProjectController
     @GetMapping("/{id}")
     public ResponseEntity<ProjectDetailResponse> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(projectService.getById(id));
+    }
+
+    @GetMapping
+    public ResponseEntity<Page<ProjectDetailResponse>> getAll(Pageable pageable) {
+        return ResponseEntity.ok(projectService.getAll(pageable));
     }
 }

@@ -5,6 +5,8 @@ import com.aperture.project.entity.ProjectStatus;
 import com.aperture.project.payload.ProjectCreateRequest;
 import com.aperture.project.payload.ProjectCreateResponse;
 import com.aperture.project.repository.ProjectRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -60,5 +62,11 @@ public class ProjectService
                 project.getCreatedAt(),
                 project.getUpdatedAt()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProjectDetailResponse> getAll(Pageable pageable) {
+        return projectRepository.findAll(pageable)
+                .map(this::toDetailResponse);
     }
 }
