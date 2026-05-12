@@ -37,4 +37,10 @@ public class ProjectController
     public ResponseEntity<Page<ProjectDetailResponse>> getAll(Pageable pageable) {
         return ResponseEntity.ok(projectService.getAll(pageable));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        projectService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }

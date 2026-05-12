@@ -69,4 +69,13 @@ public class ProjectService
         return projectRepository.findAll(pageable)
                 .map(this::toDetailResponse);
     }
+
+    @Transactional
+    public void delete(UUID id) {
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ProjectNotFoundException("Project not found with id: " + id));
+
+        project.setStatus(ProjectStatus.DELETED);
+        projectRepository.save(project);
+    }
 }
