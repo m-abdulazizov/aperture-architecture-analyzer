@@ -12,18 +12,29 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.aperture.common.exception.ProjectNotFoundException;
 import com.aperture.project.payload.ProjectDetailResponse;
+import com.aperture.project.payload.ProjectUploadResponse;
+import com.aperture.storage.payload.StoredFileInfo;
+import com.aperture.storage.service.LocalStorageService;
+import com.aperture.storage.service.ZipExtractionService;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Path;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class ProjectService
-{
+public class ProjectService {
+
     private final ProjectRepository projectRepository;
+    private final LocalStorageService localStorageService;
+    private final ZipExtractionService zipExtractionService;
 
     @Transactional
-    public ProjectCreateResponse create(ProjectCreateRequest request)
-    {
+    public ProjectCreateResponse create(ProjectCreateRequest request) {
+        if (projectRepository.existsByNameIgnoreCaseAndStatusNot(request.name(), ProjectStatus.DELETED)) {
+            throw new IllegalArgumentException("Project with this name already exists");
+        }
+
         Project project = Project.builder()
                 .name(request.name())
                 .description(request.description())
@@ -41,15 +52,14 @@ public class ProjectService
     }
 
     @Transactional(readOnly = true)
-    public ProjectDetailResponse getById(UUID id){
-        Project project = projectRepository.findById(id)
+    public ProjectDetailResponse getById(UUID id) {
+        Project project = projectRepository.findByIdAndStatusNot(id, ProjectStatus.DELETED)
                 .orElseThrow(()->new ProjectNotFoundException("Project not found with id: " + id));
 
         return toDetailResponse(project);
     }
 
-    private ProjectDetailResponse toDetailResponse(Project project)
-    {
+    private ProjectDetailResponse toDetailResponse(Project project) {
         return new ProjectDetailResponse(
                 project.getId(),
                 project.getName(),
@@ -66,16 +76,44 @@ public class ProjectService
 
     @Transactional(readOnly = true)
     public Page<ProjectDetailResponse> getAll(Pageable pageable) {
-        return projectRepository.findAll(pageable)
+        return projectRepository.findAllByStatusNot(ProjectStatus.DELETED, pageable)
                 .map(this::toDetailResponse);
     }
 
     @Transactional
     public void delete(UUID id) {
-        Project project = projectRepository.findById(id)
+        Project project = projectRepository.findByIdAndStatusNot(id, ProjectStatus.DELETED)
                 .orElseThrow(() -> new ProjectNotFoundException("Project not found with id: " + id));
 
         project.setStatus(ProjectStatus.DELETED);
         projectRepository.save(project);
+    }
+
+    @Transactional
+    public ProjectUploadResponse upload(UUID id, MultipartFile file) {
+        Project project = projectRepository.findByIdAndStatusNot(id, ProjectStatus.DELETED)
+                .orElseThrow(() -> new ProjectNotFoundException("Project not found with id: " + id));
+
+        StoredFileInfo storedFileInfo = localStorageService.storeProjectArchive(project.getId(), file);
+
+        Path extractedPath = zipExtractionService.extract(
+                project.getId(),
+                Path.of(storedFileInfo.storedPath())
+        );
+
+        project.setOriginalFileName(storedFileInfo.originalFileName());
+        project.setStoredFilePath(storedFileInfo.storedPath());
+        project.setExtractedPath(extractedPath.toString());
+        project.setStatus(ProjectStatus.UPLOADED);
+        project.setFailureReason(null);
+
+        projectRepository.save(project);
+
+        return new ProjectUploadResponse(
+                project.getId(),
+                project.getOriginalFileName(),
+                project.getStatus(),
+                "Project archive uploaded and extracted successfully"
+        );
     }
 }

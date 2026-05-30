@@ -2,7 +2,6 @@ package com.aperture.project.payload;
 
 import com.aperture.project.entity.ProjectStatus;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 

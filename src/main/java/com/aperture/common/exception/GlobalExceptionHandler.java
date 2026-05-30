@@ -74,4 +74,56 @@ public class GlobalExceptionHandler
         );
         return ResponseEntity.status(status).body(response);
     }
+
+    @ExceptionHandler(InvalidFileException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidFile(
+            InvalidFileException exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(
+                exception.getMessage(),
+                request.getRequestURI(),
+                HttpStatus.BAD_REQUEST,
+                null
+        );
+    }
+
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<ApiErrorResponse> handleStorage(
+            StorageException exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(
+                exception.getMessage(),
+                request.getRequestURI(),
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                null
+        );
+    }
+
+    @ExceptionHandler(ScanFailedException.class)
+    public ResponseEntity<ApiErrorResponse> handleScanFailed(
+            ScanFailedException exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(
+                exception.getMessage(),
+                request.getRequestURI(),
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                null
+        );
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(
+            IllegalArgumentException exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(
+                exception.getMessage(),
+                request.getRequestURI(),
+                HttpStatus.BAD_REQUEST,
+                null
+        );
+    }
 }
