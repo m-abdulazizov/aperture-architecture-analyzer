@@ -35,4 +35,9 @@ public record ProjectScanContext(
                 .filter(SourceFileContext::entity)
                 .toList();
     }
+
+    public boolean isEntityType(String typeName) {
+        return entities().stream()
+                .anyMatch(sourceFile -> sourceFile.className().equals(typeName));
+    }
 }
