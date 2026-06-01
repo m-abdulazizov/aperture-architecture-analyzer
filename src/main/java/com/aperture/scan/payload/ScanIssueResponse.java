@@ -11,6 +11,7 @@ public record ScanIssueResponse(
         IssueCategory category,
         IssueSeverity severity,
         String ruleCode,
+        String fingerprint,
         String title,
         String description,
         String recommendation,

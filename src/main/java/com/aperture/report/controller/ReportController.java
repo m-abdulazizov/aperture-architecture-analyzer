@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -39,5 +40,10 @@ public class ReportController {
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=aperture-report-" + scanResultId + ".pdf")
                 .body(reportService.getPdfReport(scanResultId));
+    }
+
+    @GetMapping("/scan-results/{scanResultId}/report/sarif")
+    public ResponseEntity<Map<String, Object>> getSarifReport(@PathVariable UUID scanResultId) {
+        return ResponseEntity.ok(reportService.getSarifReport(scanResultId));
     }
 }

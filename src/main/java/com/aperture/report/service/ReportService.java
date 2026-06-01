@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -109,6 +110,47 @@ public class ReportService {
         return simplePdfService.singlePageTextPdf("Aperture Scan Report", lines);
     }
 
+    @Transactional(readOnly = true)
+    public Map<String, Object> getSarifReport(UUID scanResultId) {
+        JsonReportResponse report = getJsonReport(scanResultId);
+
+        List<Map<String, Object>> rules = report.issuesByRule().stream()
+                .map(group -> {
+                    Map<String, Object> rule = new LinkedHashMap<>();
+                    rule.put("id", group.key());
+                    rule.put("name", group.key());
+                    rule.put("shortDescription", Map.of("text", "Aperture rule " + group.key()));
+                    return rule;
+                })
+                .toList();
+
+        List<Map<String, Object>> results = report.issues().stream()
+                .map(this::toSarifResult)
+                .toList();
+
+        Map<String, Object> tool = new LinkedHashMap<>();
+        tool.put("driver", Map.of(
+                "name", "Aperture",
+                "informationUri", "https://example.com/aperture",
+                "rules", rules
+        ));
+
+        Map<String, Object> run = new LinkedHashMap<>();
+        run.put("tool", tool);
+        run.put("results", results);
+        run.put("properties", Map.of(
+                "projectName", report.project().name(),
+                "scanResultId", scanResultId.toString(),
+                "totalScore", report.scanResult().totalScore()
+        ));
+
+        Map<String, Object> sarif = new LinkedHashMap<>();
+        sarif.put("version", "2.1.0");
+        sarif.put("$schema", "https://json.schemastore.org/sarif-2.1.0.json");
+        sarif.put("runs", List.of(run));
+        return sarif;
+    }
+
     private List<IssueGroupResponse> groupIssues(List<ScanIssueResponse> issues, Function<ScanIssueResponse, String> classifier) {
         return issues.stream()
                 .collect(Collectors.groupingBy(classifier, Collectors.counting()))
@@ -118,5 +160,34 @@ public class ReportService {
                         .thenComparing(Map.Entry.comparingByKey()))
                 .map(entry -> new IssueGroupResponse(entry.getKey(), entry.getValue()))
                 .toList();
+    }
+
+    private Map<String, Object> toSarifResult(ScanIssueResponse issue) {
+        Map<String, Object> region = new LinkedHashMap<>();
+        if (issue.lineNumber() != null) {
+            region.put("startLine", issue.lineNumber());
+        }
+
+        Map<String, Object> location = new LinkedHashMap<>();
+        location.put("physicalLocation", Map.of(
+                "artifactLocation", Map.of("uri", issue.filePath() == null ? "" : issue.filePath()),
+                "region", region
+        ));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ruleId", issue.ruleCode());
+        result.put("level", sarifLevel(issue));
+        result.put("message", Map.of("text", issue.title() + ": " + issue.description()));
+        result.put("locations", List.of(location));
+        result.put("partialFingerprints", Map.of("apertureFingerprint", issue.fingerprint()));
+        return result;
+    }
+
+    private String sarifLevel(ScanIssueResponse issue) {
+        return switch (issue.severity()) {
+            case CRITICAL, HIGH -> "error";
+            case MEDIUM -> "warning";
+            case LOW, INFO -> "note";
+        };
     }
 }

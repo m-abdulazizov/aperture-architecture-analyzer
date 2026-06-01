@@ -61,6 +61,7 @@ class ScanRepositoryTest {
                 .category(IssueCategory.ARCHITECTURE)
                 .severity(IssueSeverity.HIGH)
                 .ruleCode("ARCH_CONTROLLER_REPOSITORY_DEPENDENCY")
+                .fingerprint("test-fingerprint")
                 .title("Controller directly depends on Repository")
                 .description("UserController directly depends on UserRepository.")
                 .recommendation("Move repository access to the service layer.")

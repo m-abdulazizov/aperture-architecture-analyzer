@@ -18,7 +18,8 @@ import java.util.UUID;
                 @Index(name = "idx_scan_issues_scan_result_id", columnList = "scan_result_id"),
                 @Index(name = "idx_scan_issues_category", columnList = "category"),
                 @Index(name = "idx_scan_issues_severity", columnList = "severity"),
-                @Index(name = "idx_scan_issues_rule_code", columnList = "rule_code")
+                @Index(name = "idx_scan_issues_rule_code", columnList = "rule_code"),
+                @Index(name = "idx_scan_issues_fingerprint", columnList = "fingerprint")
         }
 )
 public class ScanIssue {
@@ -41,6 +42,9 @@ public class ScanIssue {
 
     @Column(name = "rule_code", nullable = false, length = 150)
     private String ruleCode;
+
+    @Column(nullable = false, length = 128)
+    private String fingerprint;
 
     @Column(nullable = false, length = 500)
     private String title;

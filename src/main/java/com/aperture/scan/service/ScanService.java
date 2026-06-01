@@ -8,14 +8,18 @@ import com.aperture.project.repository.ProjectRepository;
 import com.aperture.scan.engine.ScannerEngine;
 import com.aperture.scan.entity.ScanIssue;
 import com.aperture.scan.entity.ScanResult;
+import com.aperture.scan.entity.SuppressedIssue;
 import com.aperture.scan.config.QualityGateProperties;
 import com.aperture.scan.payload.ScanComparisonResponse;
 import com.aperture.scan.payload.ScanIssueFilterRequest;
 import com.aperture.scan.payload.ScanIssueResponse;
 import com.aperture.scan.payload.ScanResultResponse;
 import com.aperture.scan.payload.QualityGateResponse;
+import com.aperture.scan.payload.SuppressIssueRequest;
+import com.aperture.scan.payload.SuppressedIssueResponse;
 import com.aperture.scan.repository.ScanIssueRepository;
 import com.aperture.scan.repository.ScanResultRepository;
+import com.aperture.scan.repository.SuppressedIssueRepository;
 import com.aperture.scan.rules.DetectedIssue;
 import com.aperture.scan.scoring.ScoreBreakdown;
 import com.aperture.scan.scoring.ScoreCalculator;
@@ -27,9 +31,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,6 +54,7 @@ public class ScanService {
     private final ScannerEngine scannerEngine;
     private final ScoreCalculator scoreCalculator;
     private final QualityGateProperties qualityGateProperties;
+    private final SuppressedIssueRepository suppressedIssueRepository;
 
     @Transactional
     public ScanResultResponse scanProject(UUID projectId) {
@@ -59,7 +67,7 @@ public class ScanService {
             project.setFailureReason(null);
             projectRepository.save(project);
 
-            List<DetectedIssue> detectedIssues = scannerEngine.scan(project.getId(), extractedPath);
+            List<DetectedIssue> detectedIssues = filterSuppressedIssues(project, scannerEngine.scan(project.getId(), extractedPath));
             ScoreBreakdown scoreBreakdown = scoreCalculator.calculate(detectedIssues);
             ScanResult scanResult = scanResultRepository.save(toScanResult(project, scoreBreakdown, startedAt, LocalDateTime.now()));
             scanIssueRepository.saveAll(toScanIssues(scanResult, detectedIssues));
@@ -177,6 +185,44 @@ public class ScanService {
     }
 
     @Transactional
+    public SuppressedIssueResponse suppressIssue(UUID issueId, SuppressIssueRequest request) {
+        ScanIssue issue = scanIssueRepository.findById(issueId)
+                .orElseThrow(() -> new ScanFailedException("Scan issue not found with id: " + issueId));
+        Project project = issue.getScanResult().getProject();
+
+        SuppressedIssue suppressedIssue = suppressedIssueRepository.findByProjectIdAndFingerprint(project.getId(), issue.getFingerprint())
+                .orElseGet(() -> suppressedIssueRepository.save(SuppressedIssue.builder()
+                        .project(project)
+                        .fingerprint(issue.getFingerprint())
+                        .ruleCode(issue.getRuleCode())
+                        .filePath(issue.getFilePath())
+                        .reason(request.reason())
+                        .build()));
+
+        if (!suppressedIssue.getReason().equals(request.reason())) {
+            suppressedIssue.setReason(request.reason());
+            suppressedIssue = suppressedIssueRepository.save(suppressedIssue);
+        }
+
+        return toSuppressedIssueResponse(suppressedIssue);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SuppressedIssueResponse> getProjectSuppressions(UUID projectId) {
+        loadActiveProject(projectId);
+        return suppressedIssueRepository.findAllByProjectIdOrderByCreatedAtDesc(projectId).stream()
+                .map(this::toSuppressedIssueResponse)
+                .toList();
+    }
+
+    @Transactional
+    public void deleteSuppression(UUID suppressionId) {
+        SuppressedIssue suppressedIssue = suppressedIssueRepository.findById(suppressionId)
+                .orElseThrow(() -> new ScanFailedException("Suppression not found with id: " + suppressionId));
+        suppressedIssueRepository.delete(suppressedIssue);
+    }
+
+    @Transactional
     public int deleteOldProjectScanResults(UUID projectId, int keepLast) {
         if (keepLast < 0) {
             throw new ScanFailedException("keepLast must not be negative");
@@ -236,6 +282,7 @@ public class ScanService {
                         .category(issue.category())
                         .severity(issue.severity())
                         .ruleCode(issue.ruleCode())
+                        .fingerprint(issueFingerprint(issue))
                         .title(issue.title())
                         .description(issue.description())
                         .recommendation(issue.recommendation())
@@ -273,6 +320,7 @@ public class ScanService {
                 scanIssue.getCategory(),
                 scanIssue.getSeverity(),
                 scanIssue.getRuleCode(),
+                scanIssue.getFingerprint(),
                 scanIssue.getTitle(),
                 scanIssue.getDescription(),
                 scanIssue.getRecommendation(),
@@ -292,16 +340,54 @@ public class ScanService {
     private Map<String, ScanIssueResponse> issueMap(List<ScanIssueResponse> issues) {
         return issues.stream()
                 .collect(Collectors.toMap(
-                        this::issueFingerprint,
+                        ScanIssueResponse::fingerprint,
                         Function.identity(),
                         (first, second) -> first
                 ));
     }
 
-    private String issueFingerprint(ScanIssueResponse issue) {
-        return issue.ruleCode() + "|"
-                + issue.filePath() + "|"
-                + issue.lineNumber() + "|"
-                + issue.title();
+    private List<DetectedIssue> filterSuppressedIssues(Project project, List<DetectedIssue> detectedIssues) {
+        Set<String> suppressedFingerprints = suppressedIssueRepository.findAllByProjectId(project.getId()).stream()
+                .map(SuppressedIssue::getFingerprint)
+                .collect(Collectors.toSet());
+
+        if (suppressedFingerprints.isEmpty()) {
+            return detectedIssues;
+        }
+
+        return detectedIssues.stream()
+                .filter(issue -> !suppressedFingerprints.contains(issueFingerprint(issue)))
+                .toList();
+    }
+
+    private SuppressedIssueResponse toSuppressedIssueResponse(SuppressedIssue suppressedIssue) {
+        return new SuppressedIssueResponse(
+                suppressedIssue.getId(),
+                suppressedIssue.getProject().getId(),
+                suppressedIssue.getFingerprint(),
+                suppressedIssue.getRuleCode(),
+                suppressedIssue.getFilePath(),
+                suppressedIssue.getReason(),
+                suppressedIssue.getCreatedAt()
+        );
+    }
+
+    private String issueFingerprint(DetectedIssue issue) {
+        return sha256(issue.ruleCode() + "|"
+                + normalizeFingerprintPart(issue.filePath()) + "|"
+                + normalizeFingerprintPart(issue.title()));
+    }
+
+    private String normalizeFingerprintPart(String value) {
+        return value == null ? "" : value.trim().replace('\\', '/');
+    }
+
+    private String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 digest is not available", exception);
+        }
     }
 }

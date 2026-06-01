@@ -10,14 +10,18 @@ import com.aperture.scan.payload.ScanIssueFilterRequest;
 import com.aperture.scan.payload.ScanIssueResponse;
 import com.aperture.scan.payload.ScanJobResponse;
 import com.aperture.scan.payload.ScanResultResponse;
+import com.aperture.scan.payload.SuppressIssueRequest;
+import com.aperture.scan.payload.SuppressedIssueResponse;
 import com.aperture.scan.service.ScanJobService;
 import com.aperture.scan.service.ArchitectureGraphService;
 import com.aperture.scan.service.ScanService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -88,6 +92,25 @@ public class ScanController {
     @GetMapping("/scan-results/{scanResultId}/quality-gate")
     public ResponseEntity<QualityGateResponse> getQualityGate(@PathVariable UUID scanResultId) {
         return ResponseEntity.ok(scanService.getQualityGate(scanResultId));
+    }
+
+    @PostMapping("/issues/{issueId}/suppressions")
+    public ResponseEntity<SuppressedIssueResponse> suppressIssue(
+            @PathVariable UUID issueId,
+            @Valid @RequestBody SuppressIssueRequest request
+    ) {
+        return ResponseEntity.ok(scanService.suppressIssue(issueId, request));
+    }
+
+    @GetMapping("/projects/{projectId}/suppressions")
+    public ResponseEntity<List<SuppressedIssueResponse>> getProjectSuppressions(@PathVariable UUID projectId) {
+        return ResponseEntity.ok(scanService.getProjectSuppressions(projectId));
+    }
+
+    @DeleteMapping("/suppressions/{suppressionId}")
+    public ResponseEntity<Void> deleteSuppression(@PathVariable UUID suppressionId) {
+        scanService.deleteSuppression(suppressionId);
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/projects/{projectId}/scan-results")

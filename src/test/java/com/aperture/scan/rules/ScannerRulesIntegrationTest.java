@@ -96,6 +96,44 @@ class ScannerRulesIntegrationTest {
                 );
     }
 
+    @Test
+    void detectsComplexityAndMissingTestCoverageSignals() throws Exception {
+        writeSource("src/main/java/com/example/OrderService.java", """
+                package com.example;
+
+                import org.springframework.stereotype.Service;
+
+                @Service
+                public class OrderService {
+                    public void approve(String a, String b, String c, String d, String e, String f) {
+                        if (a != null) {}
+                        if (b != null) {}
+                        if (c != null) {}
+                        if (d != null) {}
+                        if (e != null) {}
+                        if (f != null) {}
+                        for (int i = 0; i < 1; i++) {}
+                        while (false) {}
+                        do {} while (false);
+                        switch (a) {
+                            case "x" -> {}
+                            default -> {}
+                        }
+                    }
+                }
+                """);
+
+        List<DetectedIssue> issues = scannerEngine.scan(UUID.randomUUID(), rootDirectory);
+
+        assertThat(issues)
+                .extracting(DetectedIssue::ruleCode)
+                .contains(
+                        "MAINT_COMPLEX_METHOD",
+                        "MAINT_TOO_MANY_PARAMETERS",
+                        "TEST_MISSING_CLASS_TEST"
+                );
+    }
+
     private void writeSource(String relativePath, String content) throws Exception {
         writeFile(relativePath, content);
     }
