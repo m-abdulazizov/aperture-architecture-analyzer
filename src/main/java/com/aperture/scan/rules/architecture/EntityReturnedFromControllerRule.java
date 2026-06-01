@@ -43,7 +43,8 @@ public class EntityReturnedFromControllerRule implements ScannerRule {
         return context.entities().stream()
                 .anyMatch(entity -> returnType.equals(entity.className())
                         || returnType.contains("<" + entity.className() + ">")
-                        || returnType.endsWith("<" + entity.className() + ">>"));
+                        || returnType.endsWith("<" + entity.className() + ">>")
+                        || returnType.equals("ResponseEntity<" + entity.className() + ">"));
     }
 
     private DetectedIssue issue(SourceFileContext controller, MethodDeclaration method) {

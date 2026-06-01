@@ -2,6 +2,7 @@ package com.aperture.scan.engine;
 
 import com.aperture.scan.entity.IssueCategory;
 import com.aperture.scan.entity.IssueSeverity;
+import com.aperture.scan.config.RuleProperties;
 import com.aperture.scan.rules.DetectedIssue;
 import com.aperture.scan.rules.ScannerRule;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,8 @@ class ScannerEngineTest {
                 new SourceFileDiscovery(),
                 new ConfigFileDiscovery(),
                 new JavaSourceParser(),
-                List.of(new ContextCountingRule())
+                List.of(new ContextCountingRule()),
+                new RuleProperties()
         );
 
         List<DetectedIssue> issues = scannerEngine.scan(projectId, rootDirectory);

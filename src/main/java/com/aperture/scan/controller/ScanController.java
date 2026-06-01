@@ -4,6 +4,7 @@ import com.aperture.common.response.PageResponse;
 import com.aperture.scan.entity.IssueCategory;
 import com.aperture.scan.entity.IssueSeverity;
 import com.aperture.scan.payload.ScanComparisonResponse;
+import com.aperture.scan.payload.QualityGateResponse;
 import com.aperture.scan.payload.ScanIssueFilterRequest;
 import com.aperture.scan.payload.ScanIssueResponse;
 import com.aperture.scan.payload.ScanJobResponse;
@@ -79,5 +80,19 @@ public class ScanController {
             @RequestParam UUID to
     ) {
         return ResponseEntity.ok(scanService.compareScanResults(from, to));
+    }
+
+    @GetMapping("/scan-results/{scanResultId}/quality-gate")
+    public ResponseEntity<QualityGateResponse> getQualityGate(@PathVariable UUID scanResultId) {
+        return ResponseEntity.ok(scanService.getQualityGate(scanResultId));
+    }
+
+    @DeleteMapping("/projects/{projectId}/scan-results")
+    public ResponseEntity<Void> deleteOldScanResults(
+            @PathVariable UUID projectId,
+            @RequestParam(defaultValue = "5") int keepLast
+    ) {
+        scanService.deleteOldProjectScanResults(projectId, keepLast);
+        return ResponseEntity.noContent().build();
     }
 }

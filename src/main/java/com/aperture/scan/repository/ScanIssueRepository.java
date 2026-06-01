@@ -38,4 +38,6 @@ public interface ScanIssueRepository extends JpaRepository<ScanIssue, UUID> {
     );
 
     List<ScanIssue> findAllByScanResultId(UUID scanResultId);
+
+    void deleteAllByScanResultId(UUID scanResultId);
 }

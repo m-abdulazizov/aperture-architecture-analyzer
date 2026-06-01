@@ -63,6 +63,21 @@ http://localhost:8080/swagger-ui/index.html
 
 Default database settings are in `src/main/resources/application.yaml` and can be overridden with `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, and `APERTURE_STORAGE_ROOT`.
 
+Rule execution and quality gate thresholds can be configured in YAML:
+
+```yaml
+aperture:
+  rules:
+    disabled:
+      - SPRING_REQUEST_DTO_FIELD_WITHOUT_VALIDATION
+    severity-overrides:
+      SECURITY_HARDCODED_URL: MEDIUM
+  quality-gate:
+    minimum-score: 80
+    max-critical-issues: 0
+    max-high-issues: 5
+```
+
 ## Main API Flow
 
 Create a project:
@@ -90,6 +105,12 @@ POST /api/v1/projects/{projectId}/scan-jobs
 GET  /api/v1/scan-jobs/{scanJobId}
 ```
 
+Evaluate a quality gate:
+
+```http
+GET /api/v1/scan-results/{scanResultId}/quality-gate
+```
+
 List and filter scan issues:
 
 ```http
@@ -104,6 +125,12 @@ GET /api/v1/scan-results/{scanResultId}/report/json
 GET /api/v1/projects/{projectId}/report/json
 ```
 
+Get Markdown reports:
+
+```http
+GET /api/v1/scan-results/{scanResultId}/report/markdown
+```
+
 Compare two scan results:
 
 ```http
@@ -114,6 +141,24 @@ List supported rules:
 
 ```http
 GET /api/v1/rules
+```
+
+Package the bundled demo ZIP:
+
+```http
+POST /api/v1/projects/samples/vulnerable-spring/package
+```
+
+Get project statistics:
+
+```http
+GET /api/v1/projects/{projectId}/stats
+```
+
+Clean old scan history:
+
+```http
+DELETE /api/v1/projects/{projectId}/scan-results?keepLast=5
 ```
 
 ## Report Shape

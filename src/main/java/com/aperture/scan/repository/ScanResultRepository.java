@@ -16,4 +16,6 @@ public interface ScanResultRepository extends JpaRepository<ScanResult, UUID> {
     Page<ScanResult> findAllByProjectId(UUID projectId, Pageable pageable);
 
     Optional<ScanResult> findFirstByProjectIdOrderByCreatedAtDesc(UUID projectId);
+
+    long countByProjectId(UUID projectId);
 }

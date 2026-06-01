@@ -31,7 +31,7 @@ public class RepositoryUsedOutsideServiceRule implements ScannerRule {
     @Override
     public List<DetectedIssue> analyze(ProjectScanContext context) {
         return context.sourceFiles().stream()
-                .filter(sourceFile -> !sourceFile.service() && !sourceFile.repository())
+                .filter(sourceFile -> !sourceFile.controller() && !sourceFile.service() && !sourceFile.repository())
                 .filter(this::usesRepository)
                 .map(this::issue)
                 .toList();

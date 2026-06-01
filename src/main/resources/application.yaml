@@ -2,6 +2,12 @@ spring:
   application:
     name: aperture
 
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+      - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/aperture_db}
     username: ${DB_USERNAME:postgres}
@@ -25,6 +31,28 @@ spring:
 server:
   port: 8080
 
+management:
+  info:
+    env:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+info:
+  app:
+    name: Aperture
+    description: Architecture intelligence platform for Java and Spring Boot systems
+    version: 0.0.1-SNAPSHOT
+
 aperture:
   storage:
     root: ${APERTURE_STORAGE_ROOT:storage}
+  quality-gate:
+    minimum-score: 80
+    max-critical-issues: 0
+    max-high-issues: 5
+  rules:
+    disabled: []
+    severity-overrides: {}

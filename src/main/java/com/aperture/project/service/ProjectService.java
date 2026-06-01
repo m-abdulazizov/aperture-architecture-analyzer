@@ -4,7 +4,12 @@ import com.aperture.project.entity.Project;
 import com.aperture.project.entity.ProjectStatus;
 import com.aperture.project.payload.ProjectCreateRequest;
 import com.aperture.project.payload.ProjectCreateResponse;
+import com.aperture.project.payload.ProjectStatsResponse;
 import com.aperture.project.repository.ProjectRepository;
+import com.aperture.scan.entity.IssueCategory;
+import com.aperture.scan.entity.ScanResult;
+import com.aperture.scan.repository.ScanIssueRepository;
+import com.aperture.scan.repository.ScanResultRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +24,8 @@ import com.aperture.storage.service.ZipExtractionService;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Service
@@ -28,6 +35,8 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final LocalStorageService localStorageService;
     private final ZipExtractionService zipExtractionService;
+    private final ScanResultRepository scanResultRepository;
+    private final ScanIssueRepository scanIssueRepository;
 
     @Transactional
     public ProjectCreateResponse create(ProjectCreateRequest request) {
@@ -114,6 +123,29 @@ public class ProjectService {
                 project.getOriginalFileName(),
                 project.getStatus(),
                 "Project archive uploaded and extracted successfully"
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectStatsResponse getStats(UUID id) {
+        Project project = projectRepository.findByIdAndStatusNot(id, ProjectStatus.DELETED)
+                .orElseThrow(() -> new ProjectNotFoundException("Project not found with id: " + id));
+        var scanResults = scanResultRepository.findAllByProjectIdOrderByCreatedAtDesc(project.getId());
+        ScanResult latest = scanResults.isEmpty() ? null : scanResults.getFirst();
+        ScanResult previous = scanResults.size() < 2 ? null : scanResults.get(1);
+        Map<IssueCategory, Long> issuesByCategory = latest == null
+                ? Map.of()
+                : scanIssueRepository.findAllByScanResultId(latest.getId()).stream()
+                        .collect(Collectors.groupingBy(issue -> issue.getCategory(), Collectors.counting()));
+
+        return new ProjectStatsResponse(
+                project.getId(),
+                scanResults.size(),
+                latest == null ? null : latest.getTotalScore(),
+                previous == null ? null : previous.getTotalScore(),
+                latest == null || previous == null ? null : latest.getTotalScore() - previous.getTotalScore(),
+                latest == null ? null : latest.getCreatedAt(),
+                issuesByCategory
         );
     }
 }

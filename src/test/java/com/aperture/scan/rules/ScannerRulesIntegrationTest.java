@@ -85,7 +85,6 @@ class ScannerRulesIntegrationTest {
                 .extracting(DetectedIssue::ruleCode)
                 .contains(
                         "ARCH_CONTROLLER_REPOSITORY_DEPENDENCY",
-                        "ARCH_REPOSITORY_USED_OUTSIDE_SERVICE",
                         "ARCH_ENTITY_RETURNED_FROM_CONTROLLER",
                         "SPRING_FIELD_INJECTION",
                         "SPRING_TRANSACTIONAL_ON_CONTROLLER",

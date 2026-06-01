@@ -8,10 +8,12 @@ import com.aperture.project.repository.ProjectRepository;
 import com.aperture.scan.engine.ScannerEngine;
 import com.aperture.scan.entity.ScanIssue;
 import com.aperture.scan.entity.ScanResult;
+import com.aperture.scan.config.QualityGateProperties;
 import com.aperture.scan.payload.ScanComparisonResponse;
 import com.aperture.scan.payload.ScanIssueFilterRequest;
 import com.aperture.scan.payload.ScanIssueResponse;
 import com.aperture.scan.payload.ScanResultResponse;
+import com.aperture.scan.payload.QualityGateResponse;
 import com.aperture.scan.repository.ScanIssueRepository;
 import com.aperture.scan.repository.ScanResultRepository;
 import com.aperture.scan.rules.DetectedIssue;
@@ -27,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,6 +46,7 @@ public class ScanService {
     private final ScanIssueRepository scanIssueRepository;
     private final ScannerEngine scannerEngine;
     private final ScoreCalculator scoreCalculator;
+    private final QualityGateProperties qualityGateProperties;
 
     @Transactional
     public ScanResultResponse scanProject(UUID projectId) {
@@ -141,6 +145,50 @@ public class ScanService {
                 fixedKeys.stream().map(fromIssues::get).toList(),
                 persistentKeys.stream().map(toIssues::get).toList()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public QualityGateResponse getQualityGate(UUID scanResultId) {
+        ScanResult scanResult = scanResultRepository.findById(scanResultId)
+                .orElseThrow(() -> new ScanFailedException("Scan result not found with id: " + scanResultId));
+        List<String> failures = new ArrayList<>();
+
+        if (scanResult.getTotalScore() < qualityGateProperties.getMinimumScore()) {
+            failures.add("Total score is below the minimum threshold");
+        }
+        if (scanResult.getCriticalIssues() > qualityGateProperties.getMaxCriticalIssues()) {
+            failures.add("Critical issue count exceeds the allowed threshold");
+        }
+        if (scanResult.getHighIssues() > qualityGateProperties.getMaxHighIssues()) {
+            failures.add("High issue count exceeds the allowed threshold");
+        }
+
+        return new QualityGateResponse(
+                scanResult.getId(),
+                failures.isEmpty(),
+                qualityGateProperties.getMinimumScore(),
+                scanResult.getTotalScore(),
+                qualityGateProperties.getMaxCriticalIssues(),
+                scanResult.getCriticalIssues(),
+                qualityGateProperties.getMaxHighIssues(),
+                scanResult.getHighIssues(),
+                failures
+        );
+    }
+
+    @Transactional
+    public int deleteOldProjectScanResults(UUID projectId, int keepLast) {
+        if (keepLast < 0) {
+            throw new ScanFailedException("keepLast must not be negative");
+        }
+
+        List<ScanResult> scanResults = scanResultRepository.findAllByProjectIdOrderByCreatedAtDesc(projectId);
+        List<ScanResult> toDelete = scanResults.stream()
+                .skip(keepLast)
+                .toList();
+
+        scanResultRepository.deleteAll(toDelete);
+        return toDelete.size();
     }
 
     private Project loadActiveProject(UUID projectId) {

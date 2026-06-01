@@ -5,6 +5,7 @@ import com.aperture.project.payload.ProjectDetailResponse;
 import com.aperture.project.service.ProjectService;
 import com.aperture.report.payload.IssueGroupResponse;
 import com.aperture.report.payload.JsonReportResponse;
+import com.aperture.report.payload.MarkdownReportResponse;
 import com.aperture.scan.payload.ScanIssueResponse;
 import com.aperture.scan.payload.ScanResultResponse;
 import com.aperture.scan.repository.ScanResultRepository;
@@ -53,6 +54,40 @@ public class ReportService {
                 .orElseThrow(() -> new ScanFailedException("No scan result found for project: " + projectId));
 
         return getJsonReport(scanResultId);
+    }
+
+    @Transactional(readOnly = true)
+    public MarkdownReportResponse getMarkdownReport(UUID scanResultId) {
+        JsonReportResponse report = getJsonReport(scanResultId);
+        StringBuilder markdown = new StringBuilder();
+
+        markdown.append("# Aperture Scan Report\n\n");
+        markdown.append("Project: ").append(report.project().name()).append("\n\n");
+        markdown.append("## Summary\n\n");
+        markdown.append("- Total score: ").append(report.scanResult().totalScore()).append("\n");
+        markdown.append("- Total issues: ").append(report.scanResult().totalIssues()).append("\n");
+        markdown.append("- Critical: ").append(report.scanResult().criticalIssues()).append("\n");
+        markdown.append("- High: ").append(report.scanResult().highIssues()).append("\n");
+        markdown.append("- Medium: ").append(report.scanResult().mediumIssues()).append("\n");
+        markdown.append("- Low: ").append(report.scanResult().lowIssues()).append("\n\n");
+
+        markdown.append("## Issues By Category\n\n");
+        report.issuesByCategory().forEach(group ->
+                markdown.append("- ").append(group.key()).append(": ").append(group.count()).append("\n"));
+
+        markdown.append("\n## Detailed Issues\n\n");
+        for (ScanIssueResponse issue : report.issues()) {
+            markdown.append("### ").append(issue.title()).append("\n\n");
+            markdown.append("- Severity: ").append(issue.severity()).append("\n");
+            markdown.append("- Category: ").append(issue.category()).append("\n");
+            markdown.append("- Rule: `").append(issue.ruleCode()).append("`\n");
+            markdown.append("- File: `").append(issue.filePath()).append("`\n");
+            markdown.append("- Line: ").append(issue.lineNumber() == null ? "unknown" : issue.lineNumber()).append("\n\n");
+            markdown.append(issue.description()).append("\n\n");
+            markdown.append("Recommendation: ").append(issue.recommendation()).append("\n\n");
+        }
+
+        return new MarkdownReportResponse(scanResultId, markdown.toString());
     }
 
     private List<IssueGroupResponse> groupIssues(List<ScanIssueResponse> issues, Function<ScanIssueResponse, String> classifier) {

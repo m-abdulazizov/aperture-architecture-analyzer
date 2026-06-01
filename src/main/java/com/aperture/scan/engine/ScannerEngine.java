@@ -1,5 +1,7 @@
 package com.aperture.scan.engine;
 
+import com.aperture.scan.config.RuleProperties;
+import com.aperture.scan.entity.IssueSeverity;
 import com.aperture.scan.rules.DetectedIssue;
 import com.aperture.scan.rules.ScannerRule;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ public class ScannerEngine {
     private final ConfigFileDiscovery configFileDiscovery;
     private final JavaSourceParser javaSourceParser;
     private final List<ScannerRule> scannerRules;
+    private final RuleProperties ruleProperties;
 
     public List<DetectedIssue> scan(UUID projectId, Path extractedProjectPath) {
         List<Path> javaFiles = sourceFileDiscovery.findJavaFiles(extractedProjectPath);
@@ -32,7 +35,27 @@ public class ScannerEngine {
         );
 
         return scannerRules.stream()
+                .filter(scannerRule -> !ruleProperties.getDisabled().contains(scannerRule.code()))
                 .flatMap(scannerRule -> scannerRule.analyze(context).stream())
+                .map(this::applySeverityOverride)
                 .toList();
+    }
+
+    private DetectedIssue applySeverityOverride(DetectedIssue issue) {
+        IssueSeverity override = ruleProperties.getSeverityOverrides().get(issue.ruleCode());
+        if (override == null) {
+            return issue;
+        }
+
+        return new DetectedIssue(
+                issue.category(),
+                override,
+                issue.ruleCode(),
+                issue.title(),
+                issue.description(),
+                issue.recommendation(),
+                issue.filePath(),
+                issue.lineNumber()
+        );
     }
 }

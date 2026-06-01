@@ -1,11 +1,11 @@
 package com.aperture.common.exception;
 
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -17,11 +17,11 @@ public class GlobalExceptionHandler
     @ExceptionHandler(ProjectNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleProjectNotFound(
             ProjectNotFoundException exception,
-            HttpServletRequest request
+            WebRequest request
     ){
         return buildErrorResponse(
                 exception.getMessage(),
-                request.getRequestURI(),
+                requestPath(request),
                 HttpStatus.NOT_FOUND,
                 null
         );
@@ -30,7 +30,7 @@ public class GlobalExceptionHandler
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(
             MethodArgumentNotValidException exception,
-            HttpServletRequest request
+            WebRequest request
     ){
         Map<String, String> validationErrors = new LinkedHashMap<>();
 
@@ -39,7 +39,7 @@ public class GlobalExceptionHandler
 
         return buildErrorResponse(
                 "Validation failed",
-                request.getRequestURI(),
+                requestPath(request),
                 HttpStatus.BAD_REQUEST,
                 validationErrors
         );
@@ -48,11 +48,11 @@ public class GlobalExceptionHandler
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGeneric(
             Exception exception,
-            HttpServletRequest request
+            WebRequest request
     ){
         return buildErrorResponse(
                 exception.getMessage(),
-                request.getRequestURI(),
+                requestPath(request),
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 null
         );
@@ -78,11 +78,11 @@ public class GlobalExceptionHandler
     @ExceptionHandler(InvalidFileException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidFile(
             InvalidFileException exception,
-            HttpServletRequest request
+            WebRequest request
     ) {
         return buildErrorResponse(
                 exception.getMessage(),
-                request.getRequestURI(),
+                requestPath(request),
                 HttpStatus.BAD_REQUEST,
                 null
         );
@@ -91,11 +91,11 @@ public class GlobalExceptionHandler
     @ExceptionHandler(StorageException.class)
     public ResponseEntity<ApiErrorResponse> handleStorage(
             StorageException exception,
-            HttpServletRequest request
+            WebRequest request
     ) {
         return buildErrorResponse(
                 exception.getMessage(),
-                request.getRequestURI(),
+                requestPath(request),
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 null
         );
@@ -104,11 +104,11 @@ public class GlobalExceptionHandler
     @ExceptionHandler(ScanFailedException.class)
     public ResponseEntity<ApiErrorResponse> handleScanFailed(
             ScanFailedException exception,
-            HttpServletRequest request
+            WebRequest request
     ) {
         return buildErrorResponse(
                 exception.getMessage(),
-                request.getRequestURI(),
+                requestPath(request),
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 null
         );
@@ -117,13 +117,21 @@ public class GlobalExceptionHandler
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalArgument(
             IllegalArgumentException exception,
-            HttpServletRequest request
+            WebRequest request
     ) {
         return buildErrorResponse(
                 exception.getMessage(),
-                request.getRequestURI(),
+                requestPath(request),
                 HttpStatus.BAD_REQUEST,
                 null
         );
+    }
+
+    private String requestPath(WebRequest request) {
+        String description = request.getDescription(false);
+        if (description.startsWith("uri=")) {
+            return description.substring(4);
+        }
+        return description;
     }
 }
