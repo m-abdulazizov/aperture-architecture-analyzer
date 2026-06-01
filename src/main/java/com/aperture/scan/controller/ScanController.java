@@ -4,12 +4,14 @@ import com.aperture.common.response.PageResponse;
 import com.aperture.scan.entity.IssueCategory;
 import com.aperture.scan.entity.IssueSeverity;
 import com.aperture.scan.payload.ScanComparisonResponse;
+import com.aperture.scan.payload.ArchitectureGraphResponse;
 import com.aperture.scan.payload.QualityGateResponse;
 import com.aperture.scan.payload.ScanIssueFilterRequest;
 import com.aperture.scan.payload.ScanIssueResponse;
 import com.aperture.scan.payload.ScanJobResponse;
 import com.aperture.scan.payload.ScanResultResponse;
 import com.aperture.scan.service.ScanJobService;
+import com.aperture.scan.service.ArchitectureGraphService;
 import com.aperture.scan.service.ScanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +27,7 @@ public class ScanController {
 
     private final ScanService scanService;
     private final ScanJobService scanJobService;
+    private final ArchitectureGraphService architectureGraphService;
 
     @PostMapping("/projects/{projectId}/scan")
     public ResponseEntity<ScanResultResponse> scanProject(@PathVariable UUID projectId) {
@@ -94,5 +97,10 @@ public class ScanController {
     ) {
         scanService.deleteOldProjectScanResults(projectId, keepLast);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/projects/{projectId}/architecture/graph")
+    public ResponseEntity<ArchitectureGraphResponse> getArchitectureGraph(@PathVariable UUID projectId) {
+        return ResponseEntity.ok(architectureGraphService.getGraph(projectId));
     }
 }

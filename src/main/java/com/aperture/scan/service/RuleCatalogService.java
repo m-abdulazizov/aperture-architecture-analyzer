@@ -22,6 +22,26 @@ public class RuleCatalogService {
                 .toList();
     }
 
+    public RuleMetadataResponse getRule(String ruleCode) {
+        return scannerRules.stream()
+                .filter(rule -> rule.code().equals(ruleCode))
+                .findFirst()
+                .map(this::toMetadata)
+                .orElseThrow(() -> new IllegalArgumentException("Rule not found: " + ruleCode));
+    }
+
+    public String getRuleDocumentation(String ruleCode) {
+        RuleMetadataResponse rule = getRule(ruleCode);
+        return "# " + rule.title() + "\n\n"
+                + "- Code: `" + rule.code() + "`\n"
+                + "- Category: " + rule.category() + "\n"
+                + "- Default severity: " + rule.defaultSeverity() + "\n\n"
+                + "## Why It Matters\n\n"
+                + rule.description() + "\n\n"
+                + "## Recommended Fix\n\n"
+                + rule.recommendation() + "\n";
+    }
+
     private RuleMetadataResponse toMetadata(ScannerRule rule) {
         RuleDescription description = describe(rule.code());
         return new RuleMetadataResponse(

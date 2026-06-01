@@ -1,9 +1,9 @@
 package com.aperture.scan.engine;
 
-import com.aperture.scan.config.RuleProperties;
 import com.aperture.scan.entity.IssueSeverity;
 import com.aperture.scan.rules.DetectedIssue;
 import com.aperture.scan.rules.ScannerRule;
+import com.aperture.scan.service.RuleConfigurationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -19,7 +19,7 @@ public class ScannerEngine {
     private final ConfigFileDiscovery configFileDiscovery;
     private final JavaSourceParser javaSourceParser;
     private final List<ScannerRule> scannerRules;
-    private final RuleProperties ruleProperties;
+    private final RuleConfigurationService ruleConfigurationService;
 
     public List<DetectedIssue> scan(UUID projectId, Path extractedProjectPath) {
         List<Path> javaFiles = sourceFileDiscovery.findJavaFiles(extractedProjectPath);
@@ -35,21 +35,21 @@ public class ScannerEngine {
         );
 
         return scannerRules.stream()
-                .filter(scannerRule -> !ruleProperties.getDisabled().contains(scannerRule.code()))
+                .filter(scannerRule -> ruleConfigurationService.isEnabled(projectId, scannerRule.code()))
                 .flatMap(scannerRule -> scannerRule.analyze(context).stream())
-                .map(this::applySeverityOverride)
+                .map(issue -> applySeverityOverride(projectId, issue))
                 .toList();
     }
 
-    private DetectedIssue applySeverityOverride(DetectedIssue issue) {
-        IssueSeverity override = ruleProperties.getSeverityOverrides().get(issue.ruleCode());
-        if (override == null) {
+    private DetectedIssue applySeverityOverride(UUID projectId, DetectedIssue issue) {
+        IssueSeverity severity = ruleConfigurationService.severityFor(projectId, issue.ruleCode(), issue.severity());
+        if (severity == issue.severity()) {
             return issue;
         }
 
         return new DetectedIssue(
                 issue.category(),
-                override,
+                severity,
                 issue.ruleCode(),
                 issue.title(),
                 issue.description(),

@@ -1,8 +1,11 @@
 package com.aperture.project.controller;
 
 import com.aperture.project.payload.ProjectDetailResponse;
+import com.aperture.project.payload.GitHubImportRequest;
+import com.aperture.project.payload.GitHubImportResponse;
 import com.aperture.project.payload.ProjectStatsResponse;
 import com.aperture.project.payload.SampleZipResponse;
+import com.aperture.project.service.GitHubImportService;
 import com.aperture.project.service.SampleProjectService;
 import com.aperture.project.service.ProjectService;
 import com.aperture.project.payload.ProjectCreateRequest;
@@ -26,6 +29,7 @@ public class ProjectController
 {
     private final ProjectService projectService;
     private final SampleProjectService sampleProjectService;
+    private final GitHubImportService gitHubImportService;
 
     @PostMapping
     public ResponseEntity<ProjectCreateResponse> create(@Valid @RequestBody ProjectCreateRequest request){
@@ -66,5 +70,10 @@ public class ProjectController
     @PostMapping("/samples/vulnerable-spring/package")
     public ResponseEntity<SampleZipResponse> packageVulnerableSample() {
         return ResponseEntity.ok(sampleProjectService.packageVulnerableSample());
+    }
+
+    @PostMapping("/import/github")
+    public ResponseEntity<GitHubImportResponse> importGitHubRepository(@Valid @RequestBody GitHubImportRequest request) {
+        return ResponseEntity.ok(gitHubImportService.importRepository(request));
     }
 }

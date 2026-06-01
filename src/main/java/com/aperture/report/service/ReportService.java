@@ -29,6 +29,7 @@ public class ReportService {
     private final ProjectService projectService;
     private final ScanService scanService;
     private final ScanResultRepository scanResultRepository;
+    private final SimplePdfService simplePdfService;
 
     @Transactional(readOnly = true)
     public JsonReportResponse getJsonReport(UUID scanResultId) {
@@ -88,6 +89,24 @@ public class ReportService {
         }
 
         return new MarkdownReportResponse(scanResultId, markdown.toString());
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] getPdfReport(UUID scanResultId) {
+        JsonReportResponse report = getJsonReport(scanResultId);
+        List<String> lines = new java.util.ArrayList<>();
+        lines.add("Project: " + report.project().name());
+        lines.add("Total score: " + report.scanResult().totalScore());
+        lines.add("Total issues: " + report.scanResult().totalIssues());
+        lines.add("Critical: " + report.scanResult().criticalIssues());
+        lines.add("High: " + report.scanResult().highIssues());
+        lines.add("Medium: " + report.scanResult().mediumIssues());
+        lines.add("Low: " + report.scanResult().lowIssues());
+        lines.add("");
+        lines.add("Top issues:");
+        report.issues().stream().limit(25).forEach(issue ->
+                lines.add(issue.severity() + " " + issue.ruleCode() + " " + issue.filePath() + ":" + issue.lineNumber()));
+        return simplePdfService.singlePageTextPdf("Aperture Scan Report", lines);
     }
 
     private List<IssueGroupResponse> groupIssues(List<ScanIssueResponse> issues, Function<ScanIssueResponse, String> classifier) {

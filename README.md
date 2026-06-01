@@ -141,6 +141,13 @@ List supported rules:
 
 ```http
 GET /api/v1/rules
+GET /api/v1/rules/{ruleCode}/docs
+```
+
+Configure rules per project:
+
+```http
+PUT /api/v1/rules/projects/{projectId}/config/{ruleCode}
 ```
 
 Package the bundled demo ZIP:
@@ -159,6 +166,32 @@ Clean old scan history:
 
 ```http
 DELETE /api/v1/projects/{projectId}/scan-results?keepLast=5
+```
+
+Generate a PDF report:
+
+```http
+GET /api/v1/scan-results/{scanResultId}/report/pdf
+```
+
+Import a GitHub repository:
+
+```http
+POST /api/v1/projects/import/github
+```
+
+Get an architecture dependency graph:
+
+```http
+GET /api/v1/projects/{projectId}/architecture/graph
+```
+
+Use lightweight token auth endpoints:
+
+```http
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+GET  /api/v1/auth/me
 ```
 
 ## Report Shape

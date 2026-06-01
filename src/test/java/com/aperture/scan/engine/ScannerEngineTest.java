@@ -2,9 +2,9 @@ package com.aperture.scan.engine;
 
 import com.aperture.scan.entity.IssueCategory;
 import com.aperture.scan.entity.IssueSeverity;
-import com.aperture.scan.config.RuleProperties;
 import com.aperture.scan.rules.DetectedIssue;
 import com.aperture.scan.rules.ScannerRule;
+import com.aperture.scan.service.RuleConfigurationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -39,7 +39,15 @@ class ScannerEngineTest {
                 new ConfigFileDiscovery(),
                 new JavaSourceParser(),
                 List.of(new ContextCountingRule()),
-                new RuleProperties()
+                org.mockito.Mockito.mock(RuleConfigurationService.class, invocation -> {
+                    if (invocation.getMethod().getName().equals("isEnabled")) {
+                        return true;
+                    }
+                    if (invocation.getMethod().getName().equals("severityFor")) {
+                        return invocation.getArgument(2);
+                    }
+                    return null;
+                })
         );
 
         List<DetectedIssue> issues = scannerEngine.scan(projectId, rootDirectory);

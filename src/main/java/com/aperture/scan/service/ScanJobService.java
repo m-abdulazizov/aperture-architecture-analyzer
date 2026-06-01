@@ -63,6 +63,8 @@ public class ScanJobService {
                 job.getProject().getId(),
                 job.getScanResult() == null ? null : job.getScanResult().getId(),
                 job.getStatus(),
+                job.getStage(),
+                job.getProgressPercent(),
                 job.getFailureReason(),
                 job.getCreatedAt(),
                 job.getStartedAt(),

@@ -39,6 +39,13 @@ public class ScanJob {
     @Column(nullable = false, length = 50)
     private ScanJobStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50)
+    private ScanJobStage stage;
+
+    @Column(name = "progress_percent", nullable = false)
+    private int progressPercent;
+
     @Column(name = "failure_reason", columnDefinition = "text")
     private String failureReason;
 
@@ -56,6 +63,9 @@ public class ScanJob {
         this.createdAt = LocalDateTime.now();
         if (this.status == null) {
             this.status = ScanJobStatus.QUEUED;
+        }
+        if (this.stage == null) {
+            this.stage = ScanJobStage.QUEUED;
         }
     }
 }
