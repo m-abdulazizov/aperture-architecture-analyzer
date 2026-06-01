@@ -1,8 +1,14 @@
 package com.aperture.scan.controller;
 
 import com.aperture.common.response.PageResponse;
+import com.aperture.scan.entity.IssueCategory;
+import com.aperture.scan.entity.IssueSeverity;
+import com.aperture.scan.payload.ScanComparisonResponse;
+import com.aperture.scan.payload.ScanIssueFilterRequest;
 import com.aperture.scan.payload.ScanIssueResponse;
+import com.aperture.scan.payload.ScanJobResponse;
 import com.aperture.scan.payload.ScanResultResponse;
+import com.aperture.scan.service.ScanJobService;
 import com.aperture.scan.service.ScanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -17,10 +23,29 @@ import java.util.UUID;
 public class ScanController {
 
     private final ScanService scanService;
+    private final ScanJobService scanJobService;
 
     @PostMapping("/projects/{projectId}/scan")
     public ResponseEntity<ScanResultResponse> scanProject(@PathVariable UUID projectId) {
         return ResponseEntity.ok(scanService.scanProject(projectId));
+    }
+
+    @PostMapping("/projects/{projectId}/scan-jobs")
+    public ResponseEntity<ScanJobResponse> startAsyncScan(@PathVariable UUID projectId) {
+        return ResponseEntity.accepted().body(scanJobService.startAsyncScan(projectId));
+    }
+
+    @GetMapping("/projects/{projectId}/scan-jobs")
+    public ResponseEntity<PageResponse<ScanJobResponse>> getProjectScanJobs(
+            @PathVariable UUID projectId,
+            Pageable pageable
+    ) {
+        return ResponseEntity.ok(PageResponse.from(scanJobService.getProjectScanJobs(projectId, pageable)));
+    }
+
+    @GetMapping("/scan-jobs/{scanJobId}")
+    public ResponseEntity<ScanJobResponse> getScanJob(@PathVariable UUID scanJobId) {
+        return ResponseEntity.ok(scanJobService.getScanJob(scanJobId));
     }
 
     @GetMapping("/projects/{projectId}/scan-results")
@@ -39,8 +64,20 @@ public class ScanController {
     @GetMapping("/scan-results/{scanResultId}/issues")
     public ResponseEntity<PageResponse<ScanIssueResponse>> getScanIssues(
             @PathVariable UUID scanResultId,
+            @RequestParam(required = false) IssueSeverity severity,
+            @RequestParam(required = false) IssueCategory category,
+            @RequestParam(required = false) String ruleCode,
             Pageable pageable
     ) {
-        return ResponseEntity.ok(PageResponse.from(scanService.getScanIssues(scanResultId, pageable)));
+        ScanIssueFilterRequest filter = new ScanIssueFilterRequest(severity, category, ruleCode);
+        return ResponseEntity.ok(PageResponse.from(scanService.getScanIssues(scanResultId, filter, pageable)));
+    }
+
+    @GetMapping("/scan-results/compare")
+    public ResponseEntity<ScanComparisonResponse> compareScanResults(
+            @RequestParam UUID from,
+            @RequestParam UUID to
+    ) {
+        return ResponseEntity.ok(scanService.compareScanResults(from, to));
     }
 }

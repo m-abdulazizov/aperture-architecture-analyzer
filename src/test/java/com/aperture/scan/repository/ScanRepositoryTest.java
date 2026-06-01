@@ -94,5 +94,21 @@ class ScanRepositoryTest {
                 IssueCategory.ARCHITECTURE,
                 PageRequest.of(0, 10)
         )).hasSize(1);
+
+        assertThat(scanIssueRepository.findAllByFilters(
+                scanResult.getId(),
+                IssueSeverity.HIGH,
+                IssueCategory.ARCHITECTURE,
+                "ARCH_CONTROLLER_REPOSITORY_DEPENDENCY",
+                PageRequest.of(0, 10)
+        )).hasSize(1);
+
+        assertThat(scanIssueRepository.findAllByFilters(
+                scanResult.getId(),
+                IssueSeverity.CRITICAL,
+                IssueCategory.ARCHITECTURE,
+                "ARCH_CONTROLLER_REPOSITORY_DEPENDENCY",
+                PageRequest.of(0, 10)
+        )).isEmpty();
     }
 }

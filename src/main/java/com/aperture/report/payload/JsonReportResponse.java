@@ -10,6 +10,9 @@ import java.util.List;
 public record JsonReportResponse(
         ProjectDetailResponse project,
         ScanResultResponse scanResult,
+        List<IssueGroupResponse> issuesByCategory,
+        List<IssueGroupResponse> issuesBySeverity,
+        List<IssueGroupResponse> issuesByRule,
         List<ScanIssueResponse> issues,
         LocalDateTime generatedAt
 ) {

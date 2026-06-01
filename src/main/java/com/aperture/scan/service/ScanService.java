@@ -8,6 +8,8 @@ import com.aperture.project.repository.ProjectRepository;
 import com.aperture.scan.engine.ScannerEngine;
 import com.aperture.scan.entity.ScanIssue;
 import com.aperture.scan.entity.ScanResult;
+import com.aperture.scan.payload.ScanComparisonResponse;
+import com.aperture.scan.payload.ScanIssueFilterRequest;
 import com.aperture.scan.payload.ScanIssueResponse;
 import com.aperture.scan.payload.ScanResultResponse;
 import com.aperture.scan.repository.ScanIssueRepository;
@@ -24,7 +26,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Service
@@ -80,8 +87,60 @@ public class ScanService {
 
     @Transactional(readOnly = true)
     public Page<ScanIssueResponse> getScanIssues(UUID scanResultId, Pageable pageable) {
-        return scanIssueRepository.findAllByScanResultId(scanResultId, pageable)
+        return getScanIssues(scanResultId, new ScanIssueFilterRequest(null, null, null), pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ScanIssueResponse> getScanIssues(UUID scanResultId, ScanIssueFilterRequest filter, Pageable pageable) {
+        return scanIssueRepository.findAllByFilters(
+                        scanResultId,
+                        filter.severity(),
+                        filter.category(),
+                        normalizeRuleCode(filter.ruleCode()),
+                        pageable
+                )
                 .map(this::toIssueResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ScanIssueResponse> getAllScanIssues(UUID scanResultId) {
+        return scanIssueRepository.findAllByScanResultId(scanResultId).stream()
+                .map(this::toIssueResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ScanComparisonResponse compareScanResults(UUID fromScanResultId, UUID toScanResultId) {
+        ScanResult fromScanResult = scanResultRepository.findById(fromScanResultId)
+                .orElseThrow(() -> new ScanFailedException("Scan result not found with id: " + fromScanResultId));
+        ScanResult toScanResult = scanResultRepository.findById(toScanResultId)
+                .orElseThrow(() -> new ScanFailedException("Scan result not found with id: " + toScanResultId));
+
+        Map<String, ScanIssueResponse> fromIssues = issueMap(getAllScanIssues(fromScanResultId));
+        Map<String, ScanIssueResponse> toIssues = issueMap(getAllScanIssues(toScanResultId));
+
+        Set<String> newKeys = new LinkedHashSet<>(toIssues.keySet());
+        newKeys.removeAll(fromIssues.keySet());
+
+        Set<String> fixedKeys = new LinkedHashSet<>(fromIssues.keySet());
+        fixedKeys.removeAll(toIssues.keySet());
+
+        Set<String> persistentKeys = new LinkedHashSet<>(toIssues.keySet());
+        persistentKeys.retainAll(fromIssues.keySet());
+
+        return new ScanComparisonResponse(
+                fromScanResultId,
+                toScanResultId,
+                fromScanResult.getTotalScore(),
+                toScanResult.getTotalScore(),
+                toScanResult.getTotalScore() - fromScanResult.getTotalScore(),
+                newKeys.size(),
+                fixedKeys.size(),
+                persistentKeys.size(),
+                newKeys.stream().map(toIssues::get).toList(),
+                fixedKeys.stream().map(fromIssues::get).toList(),
+                persistentKeys.stream().map(toIssues::get).toList()
+        );
     }
 
     private Project loadActiveProject(UUID projectId) {
@@ -173,5 +232,28 @@ public class ScanService {
                 scanIssue.getLineNumber(),
                 scanIssue.getCreatedAt()
         );
+    }
+
+    private String normalizeRuleCode(String ruleCode) {
+        if (ruleCode == null || ruleCode.isBlank()) {
+            return null;
+        }
+        return ruleCode;
+    }
+
+    private Map<String, ScanIssueResponse> issueMap(List<ScanIssueResponse> issues) {
+        return issues.stream()
+                .collect(Collectors.toMap(
+                        this::issueFingerprint,
+                        Function.identity(),
+                        (first, second) -> first
+                ));
+    }
+
+    private String issueFingerprint(ScanIssueResponse issue) {
+        return issue.ruleCode() + "|"
+                + issue.filePath() + "|"
+                + issue.lineNumber() + "|"
+                + issue.title();
     }
 }
