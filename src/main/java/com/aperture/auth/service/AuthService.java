@@ -5,6 +5,7 @@ import com.aperture.auth.payload.AuthRequest;
 import com.aperture.auth.payload.AuthResponse;
 import com.aperture.auth.repository.AppUserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import java.util.UUID;
 public class AuthService {
 
     private final AppUserRepository appUserRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public AuthResponse register(AuthRequest request) {
@@ -28,8 +30,9 @@ public class AuthService {
 
         AppUser user = appUserRepository.save(AppUser.builder()
                 .email(request.email().toLowerCase())
-                .passwordHash(hash(request.password()))
+                .passwordHash(passwordEncoder.encode(request.password()))
                 .apiToken("apt_" + UUID.randomUUID())
+                .role("USER")
                 .build());
 
         return toResponse(user);
@@ -39,7 +42,7 @@ public class AuthService {
     public AuthResponse login(AuthRequest request) {
         AppUser user = appUserRepository.findByEmailIgnoreCase(request.email())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
-        if (!user.getPasswordHash().equals(hash(request.password()))) {
+        if (!passwordMatches(request.password(), user)) {
             throw new IllegalArgumentException("Invalid credentials");
         }
         return toResponse(user);
@@ -50,6 +53,12 @@ public class AuthService {
         String token = authorizationHeader == null ? "" : authorizationHeader.replace("Bearer ", "");
         return appUserRepository.findByApiToken(token)
                 .map(this::toResponse)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid token"));
+    }
+
+    @Transactional(readOnly = true)
+    public AppUser authenticateToken(String token) {
+        return appUserRepository.findByApiToken(token)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid token"));
     }
 
@@ -64,5 +73,14 @@ public class AuthService {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is not available", exception);
         }
+    }
+
+    private boolean passwordMatches(String rawPassword, AppUser user) {
+        if (passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+            return true;
+        }
+
+        String legacySha256 = hash(rawPassword);
+        return legacySha256.equals(user.getPasswordHash());
     }
 }

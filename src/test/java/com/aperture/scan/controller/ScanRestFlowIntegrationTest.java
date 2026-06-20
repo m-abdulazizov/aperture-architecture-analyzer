@@ -30,6 +30,17 @@ class ScanRestFlowIntegrationTest {
 
     @Test
     void createUploadScanFilterAndReportFlowWorks() throws Exception {
+        mockMvc.perform(post("/api/v1/projects")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "name": "Unauthorized REST Flow",
+                                  "description": "Should require a token"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        String token = registerAndToken();
         String projectBody = """
                 {
                   "name": "REST Flow %s",
@@ -39,6 +50,7 @@ class ScanRestFlowIntegrationTest {
 
         JsonNode project = objectMapper.readTree(mockMvc.perform(post("/api/v1/projects")
                         .contentType("application/json")
+                        .header("Authorization", bearer(token))
                         .content(projectBody))
                 .andExpect(status().isCreated())
                 .andReturn()
@@ -54,10 +66,12 @@ class ScanRestFlowIntegrationTest {
         );
 
         mockMvc.perform(multipart("/api/v1/projects/{projectId}/upload", projectId)
-                        .file(archive))
+                        .file(archive)
+                        .header("Authorization", bearer(token)))
                 .andExpect(status().isOk());
 
-        JsonNode scan = objectMapper.readTree(mockMvc.perform(post("/api/v1/projects/{projectId}/scan", projectId))
+        JsonNode scan = objectMapper.readTree(mockMvc.perform(post("/api/v1/projects/{projectId}/scan", projectId)
+                        .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -67,6 +81,7 @@ class ScanRestFlowIntegrationTest {
         assertThat(scan.get("totalIssues").asInt()).isGreaterThan(0);
 
         JsonNode filteredIssues = objectMapper.readTree(mockMvc.perform(get("/api/v1/scan-results/{scanResultId}/issues", scanResultId)
+                        .header("Authorization", bearer(token))
                         .param("severity", "CRITICAL")
                         .param("category", "SECURITY"))
                 .andExpect(status().isOk())
@@ -76,7 +91,28 @@ class ScanRestFlowIntegrationTest {
 
         assertThat(filteredIssues.get("content")).hasSize(1);
 
-        JsonNode report = objectMapper.readTree(mockMvc.perform(get("/api/v1/scan-results/{scanResultId}/report/json", scanResultId))
+        String firstIssueId = filteredIssues.get("content").get(0).get("id").asText();
+        mockMvc.perform(post("/api/v1/issues/{issueId}/suppressions", firstIssueId)
+                        .header("Authorization", bearer(token))
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "reason": "Known demo issue"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        JsonNode suppressions = objectMapper.readTree(mockMvc.perform(get("/api/v1/projects/{projectId}/suppressions", projectId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+
+        assertThat(suppressions).hasSize(1);
+
+        JsonNode report = objectMapper.readTree(mockMvc.perform(get("/api/v1/scan-results/{scanResultId}/report/json", scanResultId)
+                        .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -85,13 +121,45 @@ class ScanRestFlowIntegrationTest {
         assertThat(report.get("issues")).hasSize(scan.get("totalIssues").asInt());
         assertThat(report.get("issuesByCategory")).isNotEmpty();
 
-        JsonNode qualityGate = objectMapper.readTree(mockMvc.perform(get("/api/v1/scan-results/{scanResultId}/quality-gate", scanResultId))
+        JsonNode sarif = objectMapper.readTree(mockMvc.perform(get("/api/v1/scan-results/{scanResultId}/report/sarif", scanResultId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+
+        assertThat(sarif.get("version").asText()).isEqualTo("2.1.0");
+        assertThat(sarif.get("runs").get(0).get("results")).isNotEmpty();
+
+        JsonNode qualityGate = objectMapper.readTree(mockMvc.perform(get("/api/v1/scan-results/{scanResultId}/quality-gate", scanResultId)
+                        .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
                 .getContentAsString());
 
         assertThat(qualityGate.get("passed").asBoolean()).isFalse();
+    }
+
+    private String registerAndToken() throws Exception {
+        JsonNode response = objectMapper.readTree(mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "email": "scan-flow-%s@example.com",
+                                  "password": "password123"
+                                }
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+
+        return response.get("token").asText();
+    }
+
+    private String bearer(String token) {
+        return "Bearer " + token;
     }
 
     private byte[] sampleArchive() throws Exception {

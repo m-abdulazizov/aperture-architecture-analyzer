@@ -2,12 +2,6 @@ spring:
   application:
     name: aperture
 
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
-      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
-      - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
-
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/aperture_db}
     username: ${DB_USERNAME:postgres}

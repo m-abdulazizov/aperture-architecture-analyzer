@@ -22,11 +22,14 @@ public class AppUser {
     @Column(nullable = false, length = 320)
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 128)
+    @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
     @Column(name = "api_token", nullable = false, unique = true, length = 100)
     private String apiToken;
+
+    @Column(nullable = false, length = 50)
+    private String role;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

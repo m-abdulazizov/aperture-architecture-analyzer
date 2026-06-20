@@ -20,7 +20,10 @@ Aperture is a Spring Boot backend platform that scans uploaded Java/Spring Boot 
 - Request DTO fields without validation annotations
 - Empty catch blocks
 - Large classes and large methods
+- High cyclomatic complexity
+- Methods with too many parameters
 - Service write methods missing `@Transactional`
+- Missing test classes for important Spring components
 
 ## Tech Stack
 
@@ -80,6 +83,19 @@ aperture:
 
 ## Main API Flow
 
+Register or login first:
+
+```http
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+```
+
+Use the returned token on protected endpoints:
+
+```http
+Authorization: Bearer apt_...
+```
+
 Create a project:
 
 ```http
@@ -131,6 +147,21 @@ Get Markdown reports:
 GET /api/v1/scan-results/{scanResultId}/report/markdown
 ```
 
+Generate PDF and SARIF reports:
+
+```http
+GET /api/v1/scan-results/{scanResultId}/report/pdf
+GET /api/v1/scan-results/{scanResultId}/report/sarif
+```
+
+Suppress a known false positive:
+
+```http
+POST /api/v1/issues/{issueId}/suppressions
+GET  /api/v1/projects/{projectId}/suppressions
+DELETE /api/v1/suppressions/{suppressionId}
+```
+
 Compare two scan results:
 
 ```http
@@ -168,12 +199,6 @@ Clean old scan history:
 DELETE /api/v1/projects/{projectId}/scan-results?keepLast=5
 ```
 
-Generate a PDF report:
-
-```http
-GET /api/v1/scan-results/{scanResultId}/report/pdf
-```
-
 Import a GitHub repository:
 
 ```http
@@ -186,7 +211,7 @@ Get an architecture dependency graph:
 GET /api/v1/projects/{projectId}/architecture/graph
 ```
 
-Use lightweight token auth endpoints:
+Use token auth endpoints:
 
 ```http
 POST /api/v1/auth/register
@@ -208,6 +233,7 @@ Example issue:
   "title": "Controller directly depends on Repository",
   "description": "UserController directly depends on UserRepository.",
   "recommendation": "Move repository access into a service class and inject the service into the controller.",
+  "fingerprint": "4f2f7...",
   "filePath": "src/main/java/com/example/UserController.java",
   "lineNumber": 14
 }
@@ -229,6 +255,16 @@ Compress-Archive -Path .\samples\vulnerable-spring\src -DestinationPath .\build\
 
 Then upload and scan that ZIP through Swagger.
 
+## Portfolio Demo Flow
+
+1. Start PostgreSQL and run the app.
+2. Register a user and copy the returned bearer token.
+3. Package the sample vulnerable Spring project.
+4. Create a project, upload the ZIP, and run a scan.
+5. Open the JSON report and inspect issue grouping by severity, category, and rule.
+6. Suppress one known false positive, re-scan, and compare scan results.
+7. Export SARIF/PDF and evaluate the quality gate.
+
 ## Architecture
 
 ```mermaid
@@ -245,14 +281,13 @@ flowchart LR
     F --> L["Scan repositories"]
     M["Report APIs"] --> N["ReportService"]
     N --> L
+    O["Auth APIs"] --> P["Spring Security Token Filter"]
 ```
 
 ## Roadmap
 
-- GitHub repository import
 - CI/CD quality gate mode
-- PDF reports
 - WebSocket scan progress
-- Authentication and team workspaces
-- Custom rule configuration
+- Team workspaces and project ownership
+- More framework-specific rules
 - Frontend dashboard
